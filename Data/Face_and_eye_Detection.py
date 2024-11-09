@@ -1,35 +1,32 @@
+from imutils.video import VideoStream
 import os
 import numpy as np
 import imutils
 import cv2
 import tensorflow as tf
-from tkinter import Tk, Label
-from PIL import Image, ImageTk
 
-# Initialize Tkinter root window
-root = Tk()
-root.title("Eye Tracking")
-
-# Create a label to display the frames
-label = Label(root)
-label.pack()
-
-# Load the trained model
-eye_cnn = tf.keras.models.load_model('eye_movement_trained.h5')
-
-# Histogram equalization function
+list1= ['looking at center','looking at left','looking at right','looking at up','looking at down']
+eye_cnn = tf.keras.models.load_model('C:\sumantha\project\eye_movement_trained.h5')
+# histogram based equalization
 def histogram_equalization(img):
     if img is None or img.size == 0:
+        # Handle case where img is empty or invalid
         return img
-    r, g, b = cv2.split(img)
+
+    # Check image dimensions (must have 3 channels for RGB)
+    if len(img.shape) < 3 or img.shape[2] < 3:
+        return img  # Not a valid RGB image
+
+    r,g,b = cv2.split(img)
     f_img1 = cv2.equalizeHist(r)
     f_img2 = cv2.equalizeHist(g)
     f_img3 = cv2.equalizeHist(b)
-    img = cv2.merge((f_img1, f_img2, f_img3))
+    img = cv2.merge((f_img1,f_img2,f_img3))
     return img
 
-# Function to get index positions of an element in a list
 def get_index_positions_2(list_of_elems, element):
+    ''' Returns the indexes of all occurrences of give element in
+    the list- listOfElements '''
     index_pos_list = []
     for i in range(len(list_of_elems)):
         if list_of_elems[i] == element:
@@ -37,39 +34,29 @@ def get_index_positions_2(list_of_elems, element):
     return index_pos_list
 
 # Define paths
-base_dir = os.path.dirname(__file__)
-prototxt_path = os.path.join(base_dir, 'model_data/deploy.prototxt')
-caffemodel_path = os.path.join(base_dir, 'model_data/weights.caffemodel')
-haarcascade_path = os.path.join(base_dir, 'haar cascade files/haarcascade_eye.xml')
+base_dir = os.path.join( os.path.dirname( __file__ ), './' )
+prototxt_path = os.path.join(base_dir + 'model_data/deploy.prototxt')
+caffemodel_path = os.path.join(base_dir + 'model_data/weights.caffemodel')
 
-# Load Haar cascade
-if not os.path.isfile(haarcascade_path):
-    print(f"Error: Haar cascade file not found at {haarcascade_path}")
-    exit(1)
-eye_cascade = cv2.CascadeClassifier(haarcascade_path)
+##
+eye_cascade = cv2.CascadeClassifier('haar cascade files/haarcascade_eye.xml')
 
-# Load the face detection model
-if not os.path.isfile(prototxt_path) or not os.path.isfile(caffemodel_path):
-    print("Error: Model files not found.")
-    exit(1)
+# Read the model
 model = cv2.dnn.readNetFromCaffe(prototxt_path, caffemodel_path)
 
 # Start video capture
 vs = cv2.VideoCapture(0)
-if not vs.isOpened():
-    print("Error: Could not open video stream.")
-    exit(1)
+cnt=1
+# Display each video frame
+W1=1
+W2=1
+T1=[' ']
+seyeimg=1
+eyemovement=[]
+Dyslexia_result=[]
+n1=0
+n2=10
 
-cnt = 1
-W1 = 1
-W2 = 1
-T1 = [' ']
-seyeimg = 1
-eyemovement = []
-Dyslexia_result = []
-n1 = 0
-n2 = 10
-list1 = ['looking at center', 'looking at left', 'looking at right', 'looking at up', 'looking at down']
 
 while True:
     ret, frame = vs.read()

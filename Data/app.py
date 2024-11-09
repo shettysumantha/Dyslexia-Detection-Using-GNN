@@ -4,7 +4,6 @@ import cv2
 import imutils
 import numpy as np
 import os
-import pickle
 import tensorflow as tf
 from PIL import Image
 from PIL import Image, ImageTk 
@@ -41,7 +40,7 @@ class App(tk.Tk):
         self.welcome_label.place(x=0, y=0, relwidth=1, relheight=1)
 
         # Schedule transition to next page after 3 seconds (3000 milliseconds)
-        self.after(7000, self.create_widgets)
+        self.after(3000, self.create_widgets)
         contents ="  Waiting for Results..."
         
         print(contents)
@@ -234,67 +233,48 @@ class App(tk.Tk):
             self.selected_filename = filename
 
     def predict_dyslexia(self):
-        if not hasattr(self, 'selected_filename') or not self.selected_filename:
+        if not self.selected_filename:
             self.update_result_text("Please select a CSV file first")
             return
-
+        
+        # Perform dyslexia prediction based on the selected CSV file
         dyslexia_detected = self.predict_dyslexia_from_csv(self.selected_filename)
-
+        
+        # Display the prediction result
         if dyslexia_detected:
-            self.result_text.config(state=NORMAL)
             self.result_text.delete(1.0, END)
             self.result_text.insert(END, "Symptoms of Dyslexia detected")
-            self.result_text.config(state=DISABLED)
         else:
-            self.result_text.config(state=NORMAL)
             self.result_text.delete(1.0, END)
             self.result_text.insert(END, "No Symptoms of Dyslexia detected")
-            self.result_text.config(state=DISABLED)
 
     def predict_dyslexia_from_csv(self, filename):
         try:
+            # Load CSV data
             df = pd.read_csv(filename)
-            
-            # Load the saved GraphSAGE model
-            with open('graph_sage_model.pkl', 'rb') as file:
-                model_data = pickle.load(file)
 
-            loaded_model = tf.keras.models.model_from_json(model_data['architecture'])
-            loaded_model.set_weights(model_data['weights'])
+            # Assuming your model expects specific columns (LX, LY, RX, RY)
+            features = df[['LX', 'LY', 'RX', 'RY']].values
 
-            # Create a graph from the CSV data
-            G = create_graph_from_data(df)
-            
-            # Extract features and labels from the graph
-            features, _ = extract_features_and_labels(G, None)  # Labels are not used for prediction
-            
-            # Make predictions using the loaded model
-            predictions = loaded_model.predict(features)
-            
-            # Convert predictions to labels
+            # Load your trained dyslexia prediction model
+            model = tf.keras.models.load_model('graph_sage_model.pkl')
+
+            # Make predictions using the model
+            predictions = model.predict(features)
+
+            # Assuming binary classification: 1 for dyslexia, 0 for no dyslexia
             predicted_labels = np.argmax(predictions, axis=1)
-            
-            # Assuming class 0 corresponds to control and class 1 corresponds to dyslexia
-            # You can adjust this based on your actual class labels
-            num_control = np.sum(predicted_labels == 0)
-            num_dyslexia = np.sum(predicted_labels == 1)
 
-            if num_control > num_dyslexia:
-                return "Control"
-            else:
-                return "Dyslexia"
+            # Check if dyslexia is detected based on predictions
+            dyslexia_detected = any(predicted_labels == 1)
+
+            return dyslexia_detected
 
         except Exception as e:
-                print(f"Error processing CSV file: {e}")
-                self.update_result_text(f"Error processing CSV file: {e}")
-                return "Error"
+            print(f"Error processing CSV file: {e}")
+            return False  # Return default result if an error occurs
 
 
-    def update_result_text(self, message):
-        self.result_text.config(state=NORMAL)
-        self.result_text.delete(1.0, END)
-        self.result_text.insert(END, message)
-        self.result_text.config(state=DISABLED)
 
 if __name__ == "__main__":
     app = App()
